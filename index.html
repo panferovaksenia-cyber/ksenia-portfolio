@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Color Map Portfolio</title>
+
+<style>
+body {
+    margin: 0;
+    background: black;
+    font-family: sans-serif;
+}
+
+#gallery {
+    display: flex;
+    flex-wrap: wrap;
+}
+
+.img-container {
+    width: 120px;
+    height: 120px;
+    overflow: hidden;
+    cursor: pointer;
+}
+
+.img-container img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: transform 0.3s;
+}
+
+.img-container:hover img {
+    transform: scale(1.1);
+}
+
+#fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.95);
+    display: none;
+    justify-content: center;
+    align-items: center;
+}
+
+#fullscreen img {
+    max-width: 90%;
+    max-height: 90%;
+}
+</style>
+</head>
+
+<body>
+
+<div id="gallery"></div>
+
+<div id="fullscreen" onclick="this.style.display='none'">
+    <img id="fullimg">
+</div>
+
+<script>
+
+// RGB → HSL
+function rgbToHsl(r, g, b) {
+    r /= 255; g /= 255; b /= 255;
+    let max = Math.max(r, g, b), min = Math.min(r, g, b);
+    let h, s, l = (max + min) / 2;
+
+    if(max === min){
+        h = s = 0;
+    } else {
+        let d = max - min;
+        s = l > 0.5 ? d / (2 - max - min) : d / (max + min);
+        switch(max){
+            case r: h = (g - b) / d + (g < b ? 6 : 0); break;
+            case g: h = (b - r) / d + 2; break;
+            case b: h = (r - g) / d + 4; break;
+        }
+        h /= 6;
+    }
+    return [h * 360, s, l];
+}
+
+function getAverageColor(img) {
+    const canvas = document.createElement("canvas");
+    const ctx = canvas.getContext("2d");
+    canvas.width = img.width;
+    canvas.height = img.height;
+    ctx.drawImage(img, 0, 0);
+
+    const data = ctx.getImageData(0, 0, img.width, img.height).data;
+    let r = 0, g = 0, b = 0;
+    let count = data.length / 4;
+
+    for (let i = 0; i < data.length; i += 4) {
+        r += data[i];
+        g += data[i+1];
+        b += data[i+2];
+    }
+
+    return [
+        r / count,
+        g / count,
+        b / count
+    ];
+}
+
+fetch("images.json")
+.then(res => res.json())
+.then(imageList => {
+
+    let loaded = [];
+    let promises = imageList.map(src => {
+        return new Promise(resolve => {
+            let img = new Image();
+            img.src = src;
+            img.onload = () => {
+                let [r,g,b] = getAverageColor(img);
+                let [h] = rgbToHsl(r,g,b);
+                loaded.push({src, h});
+                resolve();
+            };
+        });
+    });
+
+    Promise.all(promises).then(() => {
+        loaded.sort((a,b) => a.h - b.h);
+        buildGallery(loaded);
+    });
+
+});
+
+function buildGallery(images) {
+    const gallery = document.getElementById("gallery");
+
+    images.forEach(item => {
+        const div = document.createElement("div");
+        div.className = "img-container";
+
+        const img = document.createElement("img");
+        img.src = item.src;
+
+        img.onclick = () => {
+            document.getElementById("fullimg").src = item.src;
+            document.getElementById("fullscreen").style.display = "flex";
+        };
+
+        div.appendChild(img);
+        gallery.appendChild(div);
+    });
+}
+
+</script>
+</body>
+</html>
